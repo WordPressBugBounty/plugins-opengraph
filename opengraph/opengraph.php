@@ -5,7 +5,7 @@
  * Description: Adds Open Graph metadata to your pages
  * Author: Will Norris & Matthias Pfefferle
  * Author URI: https://github.com/pfefferle/wordpress-opengraph
- * Version: 2.0.0
+ * Version: 2.0.1
  * License: Apache License, Version 2.0
  * License URI: http://www.apache.org/licenses/LICENSE-2.0.html
  * Text Domain: opengraph
@@ -167,6 +167,7 @@ function opengraph_default_metadata() {
 	add_filter( 'opengraph_image', 'opengraph_parsed_image', 25 );
 	add_filter( 'opengraph_image', 'opengraph_attached_image', 25 );
 	add_filter( 'opengraph_image', 'opengraph_fallback_image', 35 );
+	add_filter( 'opengraph_image', 'opengraph_ensure_max_image', 999 );
 
 	add_filter( 'opengraph_description', 'opengraph_default_description', 5 );
 	add_filter( 'opengraph_locale', 'opengraph_default_locale', 5 );
@@ -313,10 +314,18 @@ function opengraph_block_image( $image = array() ) {
 	// Get the first image in the post content.
 	$blocks = parse_blocks( get_the_content( null, false ) );
 	foreach ( $blocks as $block ) {
+		if ( count( $image ) >= opengraph_max_images() ) {
+			break;
+		}
+
 		if (
 			'core/image' === $block['blockName'] ||
 			'core/cover' === $block['blockName']
 		) {
+			if ( ! isset( $block['attrs']['id'] ) ) {
+				continue;
+			}
+
 			$id      = $block['attrs']['id'];
 			$image[] = current( wp_get_attachment_image_src( $id, 'large' ) ?: array() ); // phpcs:ignore
 		}
@@ -435,6 +444,10 @@ function opengraph_attached_image( $image = array() ) {
 
 	// Get URLs for each image.
 	foreach ( $image_ids as $id ) {
+		if ( count( $image ) >= opengraph_max_images() ) {
+			break;
+		}
+
 		$thumbnail = wp_get_attachment_image_src( $id, 'large' );
 		if ( $thumbnail ) {
 			$image[] = $thumbnail[0];
@@ -486,6 +499,16 @@ function opengraph_fallback_image( $image = array() ) {
 	return array_unique( $image );
 }
 
+/**
+ * Ensure the image count does not exceed the maximum.
+ *
+ * @param array $image The current list of images.
+ *
+ * @return array The list of images.
+ */
+function opengraph_ensure_max_image( $image = array() ) {
+	return array_slice( $image, 0, opengraph_max_images() );
+}
 
 /**
  * Default audio property, using get_attached_media.
